@@ -11,3 +11,5 @@ encoding.egg-info/
 *.o
 *.so
 *.ninja*
+# Virtual environment
+venv/

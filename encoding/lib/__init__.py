@@ -16,6 +16,8 @@ cpu = load('enclib_cpu', [
     ], build_directory=cpu_path, verbose=False)
 
 if torch.cuda.is_available():
+    # --expt-extended-lambda is nvcc-only; skip it on ROCm (hipcc/clang++)
+    extra_flags = [] if torch.version.hip else ["--expt-extended-lambda"]
     gpu = load('enclib_gpu', [
             os.path.join(gpu_path, 'operator.cpp'),
             os.path.join(gpu_path, 'activation_kernel.cu'),
@@ -24,6 +26,5 @@ if torch.cuda.is_available():
             os.path.join(gpu_path, 'roi_align_kernel.cu'),
             os.path.join(gpu_path, 'nms_kernel.cu'),
             os.path.join(gpu_path, 'rectify_cuda.cu'),
-            os.path.join(gpu_path, 'lib_ssd.cu'),
-        ], extra_cuda_cflags=["--expt-extended-lambda"],
-        build_directory=gpu_path, verbose=False)
+        ], extra_cuda_cflags=extra_flags,
+        build_directory=gpu_path, verbose=True)
