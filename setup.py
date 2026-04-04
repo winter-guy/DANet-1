@@ -67,5 +67,6 @@ if __name__ == '__main__':
             'lib/gpu/*.h',
             'lib/gpu/*.cpp',
             'lib/gpu/*.cu',
+            'lib/gpu/*.hip',
         ]},
     )
