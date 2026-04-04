@@ -35,6 +35,7 @@ encoding/lib/cpu/roi_align_cpu.cpp
 encoding/lib/cpu/syncbn_cpu.cpp
 encoding/lib/gpu/activation_kernel.cu
 encoding/lib/gpu/common.h
+encoding/lib/gpu/common_hip.h
 encoding/lib/gpu/device_tensor.h
 encoding/lib/gpu/encoding_kernel.cu
 encoding/lib/gpu/lib_ssd.cu

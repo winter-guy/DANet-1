@@ -73,13 +73,13 @@ std::vector<at::Tensor> Non_Max_Suppression_CUDA(
   AT_ASSERT(input.size(2) == 4);
   AT_ASSERT(input.is_contiguous());
   AT_ASSERT(scores.is_contiguous());
-  AT_ASSERT(input.type().scalarType() == at::kFloat || input.type().scalarType() == at::kDouble);
-  AT_ASSERT(scores.type().scalarType() == at::kFloat || scores.type().scalarType() == at::kDouble);
+  AT_ASSERT(input.scalar_type() == at::kFloat || input.scalar_type() == at::kDouble);
+  AT_ASSERT(scores.scalar_type() == at::kFloat || scores.scalar_type() == at::kDouble);
 
   auto num_boxes = input.size(1);
   auto batch_size = input.size(0);
   //auto mask = input.type().toScalarType(at::kByte).tensor({batch_size, num_boxes});
-  auto mask = torch::zeros({batch_size, num_boxes}, input.type().toScalarType(at::kByte));
+  auto mask = torch::zeros({batch_size, num_boxes}, input.options().dtype(at::kByte));
   mask.fill_(1);
   
   //need the indices of the boxes sorted by score.
@@ -91,12 +91,12 @@ std::vector<at::Tensor> Non_Max_Suppression_CUDA(
                         //hipGetDeviceProperties in the funcion body...
 
   dim3 mask_grid(batch_size);
-  if(input.type().scalarType() == at::kFloat)
+  if(input.scalar_type() == at::kFloat)
   {
      hipLaunchKernelGGL(( nms_kernel), dim3(mask_grid), dim3(mask_block), 0, at::hip::getCurrentHIPStreamMasqueradingAsCUDA(), 
-                                        mask.data<unsigned char>(),
-                                        input.data<float>(),
-                                        sorted_inds.data<int64_t>(),
+                                        mask.data_ptr<unsigned char>(),
+                                        input.data_ptr<float>(),
+                                        sorted_inds.data_ptr<int64_t>(),
                                         num_boxes,
                                         thresh);
       AT_ASSERT(hipGetLastError() == hipSuccess);
@@ -104,9 +104,9 @@ std::vector<at::Tensor> Non_Max_Suppression_CUDA(
   else
   {
      hipLaunchKernelGGL(( nms_kernel), dim3(mask_grid), dim3(mask_block), 0, at::hip::getCurrentHIPStreamMasqueradingAsCUDA(), 
-                                        mask.data<unsigned char>(),
-                                        input.data<double>(),
-                                        sorted_inds.data<int64_t>(),
+                                        mask.data_ptr<unsigned char>(),
+                                        input.data_ptr<double>(),
+                                        sorted_inds.data_ptr<int64_t>(),
                                         num_boxes,
                                         thresh);
       AT_ASSERT(hipGetLastError() == hipSuccess);

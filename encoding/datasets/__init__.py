@@ -6,7 +6,7 @@ from .ade20k import ADE20KSegmentation
 from .pascal_voc import VOCSegmentation
 from .pascal_aug import VOCAugSegmentation
 from .pcontext import ContextSegmentation
-from .cityscapes import CitySegmentation
+from .cityscapes_v0 import CitySegmentation
 from .imagenet import ImageNetDataset
 from .minc import MINCDataset
 

@@ -13,3 +13,7 @@ encoding.egg-info/
 *.ninja*
 # Virtual environment
 venv/
+datasets/
+runs/
+*.egg-info/
+*.log

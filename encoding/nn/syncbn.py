@@ -192,6 +192,9 @@ class SyncBatchNorm(_BatchNorm):
                 "master_queue": self.master_queue,
                 "worker_queue": self.worker_queues[self.worker_ids.index(x.get_device())]
             }
+        if not self.sync:
+            return super().forward(x)
+            
         if self.inplace:
             return inp_syncbatchnorm(x, self.weight, self.bias, self.running_mean, self.running_var,
                                      extra, self.sync, self.training, self.momentum, self.eps,

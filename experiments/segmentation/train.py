@@ -93,6 +93,8 @@ class Options():
         # test option
         parser.add_argument('--test-folder', type=str, default=None,
                             help='path to test image folder')
+        parser.add_argument('--fast-test', action='store_true', default=False,
+                            help='fast test to validate pipeline over a few batches')
         # multi grid dilation option
         parser.add_argument("--multi-grid", action="store_true", default=False,
                             help="use multi grid dilation policy")
@@ -179,6 +181,7 @@ class Trainer():
         if args.cuda:
             self.model = DataParallelModel(self.model).cuda()
             self.criterion = DataParallelCriterion(self.criterion).cuda()
+        self.best_pred = 0.0
         # resuming checkpoint
         if args.resume is not None:
             if not os.path.isfile(args.resume):
@@ -200,7 +203,6 @@ class Trainer():
         # lr scheduler
         self.scheduler = utils.LR_Scheduler_Head(args.lr_scheduler, args.lr,
                                                  args.epochs, len(self.trainloader))
-        self.best_pred = 0.0
 
     def training(self, epoch):
         train_loss = 0.0
@@ -215,6 +217,8 @@ class Trainer():
             self.optimizer.step()
             train_loss += loss.item()
             tbar.set_description('Train loss: %.3f' % (train_loss / (i + 1)))
+            if getattr(self.args, 'fast_test', False) and i > 5:
+                break
 
         if self.args.no_val:
             # save checkpoint every epoch
@@ -231,8 +235,9 @@ class Trainer():
         # Fast test during the training
         def eval_batch(model, image, target):
             outputs = model(image)
-            outputs = gather(outputs, 0, dim=0)
-            pred = outputs[0]
+            if isinstance(outputs, list):
+                outputs = gather(outputs, 0, dim=0)
+            pred = outputs[0] if isinstance(outputs, tuple) else outputs
             target = target.cuda()
             correct, labeled = utils.batch_pix_accuracy(pred.data, target)
             inter, union = utils.batch_intersection_union(pred.data, target, self.nclass)
@@ -255,6 +260,8 @@ class Trainer():
             mIoU = IoU.mean()
             tbar.set_description(
                 'pixAcc: %.3f, mIoU: %.3f' % (pixAcc, mIoU))
+            if getattr(self.args, 'fast_test', False) and i > 5:
+                break
 
         new_pred = (pixAcc + mIoU)/2
         if new_pred > self.best_pred:

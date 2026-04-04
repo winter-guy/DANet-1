@@ -7,33 +7,11 @@
 ## LICENSE file in the root directory of this source tree
 ##+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
-"""Functions for Encoding Layer"""
+"""Functions for Encoding Layer (Pure PyTorch Fallback)"""
 import torch
-from torch.autograd import Function, Variable
 import torch.nn.functional as F
-from .. import lib
 
 __all__ = ['aggregate', 'scaled_l2', 'pairwise_cosine']
-
-class _aggregate(Function):
-    @staticmethod
-    def forward(ctx, A, X, C):
-        # A \in(BxNxK) R \in(BxNxKxD) => E \in(BxNxD)
-        ctx.save_for_backward(A, X, C)
-        if A.is_cuda:
-            E = lib.gpu.aggregate_forward(A, X, C)
-        else:
-            E = lib.cpu.aggregate_forward(A, X, C)
-        return E
-
-    @staticmethod
-    def backward(ctx, gradE):
-        A, X, C = ctx.saved_variables
-        if A.is_cuda:
-            gradA, gradX, gradC = lib.gpu.aggregate_backward(gradE, A, X, C)
-        else:
-            gradA, gradX, gradC = lib.cpu.aggregate_backward(gradE, A, X, C)
-        return gradA, gradX, gradC
 
 def aggregate(A, X, C):
     r""" Aggregate operation, aggregate the residuals of inputs (:math:`X`) with repect
@@ -49,35 +27,17 @@ def aggregate(A, X, C):
           (where :math:`B` is batch, :math:`N` is total number of features,
           :math:`K` is number is codewords, :math:`D` is feature dimensions.)
         - Output: :math:`E\in\mathcal{R}^{B\times K\times D}`
-
-    Examples:
-        >>> B,N,K,D = 2,3,4,5
-        >>> A = Variable(torch.cuda.DoubleTensor(B,N,K).uniform_(-0.5,0.5), requires_grad=True)
-        >>> X = Variable(torch.cuda.DoubleTensor(B,N,D).uniform_(-0.5,0.5), requires_grad=True)
-        >>> C = Variable(torch.cuda.DoubleTensor(K,D).uniform_(-0.5,0.5), requires_grad=True)
-        >>> func = encoding.aggregate()
-        >>> E = func(A, X, C)
     """
-    return _aggregate.apply(A, X, C)
-
-class _scaled_l2(Function):
-    @staticmethod
-    def forward(ctx, X, C, S):
-        if X.is_cuda:
-            SL = lib.gpu.scaled_l2_forward(X, C, S)
-        else:
-            SL = lib.cpu.scaled_l2_forward(X, C, S)
-        ctx.save_for_backward(X, C, S, SL)
-        return SL
-
-    @staticmethod
-    def backward(ctx, gradSL):
-        X, C, S, SL = ctx.saved_variables
-        if X.is_cuda:
-            gradX, gradC, gradS = lib.gpu.scaled_l2_backward(gradSL, X, C, S, SL)
-        else:
-            gradX, gradC, gradS = lib.cpu.scaled_l2_backward(gradSL, X, C, S, SL)
-        return gradX, gradC, gradS
+    # A: B x N x K
+    # X: B x N x D
+    # C: K x D
+    # Result: B x K x D
+    # e_k = sum_i a_ik (x_i - c_k) = (sum_i a_ik x_i) - (sum_i a_ik) c_k
+    # sum_i a_ik x_i: B x K x D (via matmul)
+    # sum_i a_ik: B x K (via sum)
+    AX = torch.matmul(A.transpose(1, 2), X) # B x K x D
+    sum_A = torch.sum(A, dim=1, keepdim=True).transpose(1, 2) # B x K x 1
+    return AX - sum_A * C
 
 def scaled_l2(X, C, S):
     r""" scaled_l2 distance
@@ -92,7 +52,16 @@ def scaled_l2(X, C, S):
           :math:`K` is number is codewords, :math:`D` is feature dimensions.)
         - Output: :math:`E\in\mathcal{R}^{B\times N\times K}`
     """
-    return _scaled_l2.apply(X, C, S)
+    # X: B x N x D
+    # C: K x D
+    # S: K
+    # Result: B x N x K
+    # ||x - c||^2 = ||x||^2 + ||c||^2 - 2<x, c>
+    X2 = torch.sum(X * X, dim=2, keepdim=True) # B x N x 1
+    C2 = torch.sum(C * C, dim=1) # K
+    XC = torch.matmul(X, C.t()) # B x N x K
+    dist2 = X2 + C2 - 2 * XC # B x N x K
+    return S * dist2
 
 # Experimental
 def pairwise_cosine(X, C, normalize=False):

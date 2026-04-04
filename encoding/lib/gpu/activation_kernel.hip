@@ -34,8 +34,8 @@ void LeakyRelu_Forward_CUDA(at::Tensor z, float slope) {
 void LeakyRelu_Backward_CUDA(at::Tensor z, at::Tensor dz, float slope) {
   int64_t count = z.numel();
 
-  AT_DISPATCH_FLOATING_TYPES(z.type(), "LeakyRelu_Backward_CUDA", ([&] {
-    leaky_relu_backward_impl<scalar_t>(z.data<scalar_t>(), dz.data<scalar_t>(), slope, count);
+  AT_DISPATCH_FLOATING_TYPES(z.scalar_type(), "LeakyRelu_Backward_CUDA", ([&] {
+    leaky_relu_backward_impl<scalar_t>(z.data_ptr<scalar_t>(), dz.data_ptr<scalar_t>(), slope, count);
   }));
   /*
   // unstable after scaling
